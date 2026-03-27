@@ -169,7 +169,9 @@ fn preferred_terminal(config: &Config) -> TerminalMode {
     if supports_block_terminal() {
         TerminalMode::BlockBraille
     } else {
-        eprintln!("warning: gnuplot terminal 'block' is unavailable; falling back to 'dumb ansi'");
+        eprintln!(
+            "warning: gnuplot terminal 'block' is unavailable; falling back to 'dumb ansi' (use --dumb to select this mode explicitly)"
+        );
         TerminalMode::Dumb
     }
 }

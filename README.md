@@ -64,4 +64,5 @@ set term block braille ansi
 - `--format y '%.5f'` keeps numeric formatting on y.
 - Time-like `--format x|y ...` values are passed to `gnuplot` as `set xdata/ydata time`, `set timefmt`, and `set format x/y`.
 - `--set CMD` can be repeated for raw `gnuplot` commands that do not yet have dedicated CLI options.
+- If `gnuplot` does not support the `block` terminal, `tgplot` falls back to `dumb ansi`; use `--dumb` to select that mode explicitly.
 - `gnuplot` must be installed and available on `PATH`.

@@ -1,0 +1,15 @@
+[package]
+name = "tgplot"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+mdlite = { git = "https://github.com/M-AKIMOTOO/mdlite.git" }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+incremental = false

@@ -15,9 +15,9 @@ tgplot --in text.txt using 1 2 --format y '%.5f'
 tgplot using 1 2 < text.txt
 tgplot using 2 < text.txt
 tgplot using 1 2 --in text.txt --style points
-tgplot --in text.txt using 1 2 --xrange 0 10 --yrange -10 10
+tgplot --in text.txt using 1 2 --range x 0 10 y -10 10
 tgplot --in text.txt using 1 2 --logscale y
-tgplot --in text.txt using 1 2 --xlabel Time --ylabel Flux
+tgplot --in text.txt using 1 2 --label x Time y Flux
 tgplot --in text.txt using 1 2 --set 'set samples 400'
 ```
 
@@ -32,17 +32,13 @@ set term block braille ansi
 - `--in FILE...`
 - `using X Y`
 - `--title TEXT`
-- `--xlabel TEXT`
-- `--ylabel TEXT`
+- `--label x|y TEXT`
 - `--format x|y FORMAT`
-- `--xrange MIN MAX`
-- `--yrange MIN MAX`
+- `--range x|y MIN MAX`
 - `--logscale x|y|xy`
 - `--style lines|points|linespoints`
-- `--key`
-- `--no-key`
-- `--grid`
-- `--no-grid`
+- `--key yes|no`
+- `--grid yes|no`
 - `--comments MARK...`
 - `--set CMD`
 - `--width N`
@@ -61,7 +57,9 @@ set term block braille ansi
 - `--in a.txt --in b.txt using 2` applies the same `using` clause to both files.
 - `--in a.txt b.txt using 2` is the shorter equivalent.
 - Options may appear before or after `using X Y`.
+- `--label x 'Time' y 'Flux'` can set both axis labels in one `--label`.
 - `--format x '%H:%M:%S' y '%e'` can set both axis formats in one `--format`.
+- `--range x 0 10 y -1 1` can set both axis ranges in one `--range`.
 - `--format x '%H:%M:%S'` or `--format x '%Y-%m-%dT%H:%M:%S'` enables a time-formatted x axis.
 - `--format y '%.5f'` keeps numeric formatting on y.
 - Time-like `--format x|y ...` values are passed to `gnuplot` as `set xdata/ydata time`, `set timefmt`, and `set format x/y`.

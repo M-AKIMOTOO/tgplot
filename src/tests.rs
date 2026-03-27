@@ -88,7 +88,8 @@ fn parse_args_accepts_options_before_and_after_using_clause() {
             "using".to_string(),
             "2".to_string(),
             "4".to_string(),
-            "--dumb".to_string(),
+            "--grid".to_string(),
+            "n".to_string(),
         ])
         .unwrap(),
     );
@@ -97,22 +98,24 @@ fn parse_args_accepts_options_before_and_after_using_clause() {
     assert_eq!(config.series[0].input, Some("text.txt".to_string()));
     assert_eq!(config.series[0].x_column, Some(2));
     assert_eq!(config.series[0].y_column, 4);
-    assert!(config.dumb);
+    assert!(!config.show_grid);
 }
 
 #[test]
 fn parse_args_supports_gnuplot_style_axis_options() {
     let config = unwrap_plot(
         parse_args([
-            "--xrange".to_string(),
+            "--range".to_string(),
+            "x".to_string(),
             "02:05:00".to_string(),
             "02:15:00".to_string(),
-            "--yrange".to_string(),
+            "y".to_string(),
             "-10".to_string(),
             "10".to_string(),
-            "--xlabel".to_string(),
+            "--label".to_string(),
+            "x".to_string(),
             "Time".to_string(),
-            "--ylabel".to_string(),
+            "y".to_string(),
             "Flux".to_string(),
             "--format".to_string(),
             "x".to_string(),
@@ -177,6 +180,60 @@ fn parse_args_accepts_both_axis_formats_in_one_format_clause() {
 }
 
 #[test]
+fn parse_args_accepts_both_axis_labels_in_one_label_clause() {
+    let config = unwrap_plot(
+        parse_args([
+            "--label".to_string(),
+            "x".to_string(),
+            "Time".to_string(),
+            "y".to_string(),
+            "Flux".to_string(),
+            "using".to_string(),
+            "1".to_string(),
+            "2".to_string(),
+        ])
+        .unwrap(),
+    );
+
+    assert_eq!(config.xlabel, Some("Time".to_string()));
+    assert_eq!(config.ylabel, Some("Flux".to_string()));
+}
+
+#[test]
+fn parse_args_accepts_both_axis_ranges_in_one_range_clause() {
+    let config = unwrap_plot(
+        parse_args([
+            "--range".to_string(),
+            "x".to_string(),
+            "0".to_string(),
+            "10".to_string(),
+            "y".to_string(),
+            "-1".to_string(),
+            "1".to_string(),
+            "using".to_string(),
+            "1".to_string(),
+            "2".to_string(),
+        ])
+        .unwrap(),
+    );
+
+    assert_eq!(
+        config.xrange,
+        Some(AxisRange {
+            min: "0".to_string(),
+            max: "10".to_string()
+        })
+    );
+    assert_eq!(
+        config.yrange,
+        Some(AxisRange {
+            min: "-1".to_string(),
+            max: "1".to_string()
+        })
+    );
+}
+
+#[test]
 fn parse_args_accepts_single_using_column() {
     let config = unwrap_plot(
         parse_args([
@@ -212,6 +269,25 @@ fn parse_args_accepts_multiple_comment_markers() {
         config.comment_markers,
         vec!["#".to_string(), "!".to_string(), "%".to_string()]
     );
+}
+
+#[test]
+fn parse_args_accepts_key_and_grid_toggle_values() {
+    let config = unwrap_plot(
+        parse_args([
+            "--key".to_string(),
+            "yes".to_string(),
+            "--grid".to_string(),
+            "n".to_string(),
+            "using".to_string(),
+            "1".to_string(),
+            "2".to_string(),
+        ])
+        .unwrap(),
+    );
+
+    assert!(config.show_key);
+    assert!(!config.show_grid);
 }
 
 #[test]
@@ -480,7 +556,8 @@ fn axis_value_kind_detects_time_formats() {
 #[test]
 fn numeric_xrange_still_requires_numeric_bounds() {
     let error = parse_args([
-        "--xrange".to_string(),
+        "--range".to_string(),
+        "x".to_string(),
         "02:05:00".to_string(),
         "02:15:00".to_string(),
         "using".to_string(),

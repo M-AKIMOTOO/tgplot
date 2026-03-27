@@ -9,7 +9,7 @@ source = "git+https://github.com/M-AKIMOTOO/mdlite.git#c58665427172c1b6dbc232463
 
 [[package]]
 name = "tgplot"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "mdlite",
 ]

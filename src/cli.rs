@@ -19,17 +19,13 @@ Usage:
 Options:
   --in FILE...      Read one or more input files. Use - for stdin
   --title TEXT      Set the plot title
-  --xlabel TEXT     Set the x-axis label
-  --ylabel TEXT     Set the y-axis label
+  --label AXIS TXT... Set axis labels for x or y
   --format AXIS FMT... Set axis format for x or y; accepts x/y pairs and time-like formats enable time data
-  --xrange MIN MAX  Set the x-axis range
-  --yrange MIN MAX  Set the y-axis range
+  --range AXIS MIN MAX... Set axis ranges for x or y
   --logscale AXIS   Use logarithmic axes: x, y, or xy
   --style STYLE     Plot style: lines, points, linespoints (default: lines)
-  --key             Show the legend
-  --no-key          Hide the legend (default)
-  --grid            Show the grid (default)
-  --no-grid         Hide the grid
+  --key VALUE       Legend on/off: yes/no, y/n, on/off, true/false
+  --grid VALUE      Grid on/off: yes/no, y/n, on/off, true/false
   --comments MARK... Ignore lines starting with these markers (default: #)
   --set CMD         Pass a raw gnuplot command, e.g. --set 'set samples 400'
   --detail          Show the full README-based guide
@@ -110,6 +106,33 @@ where
                     .ok_or_else(|| "missing value for --ylabel".to_string())?;
                 ylabel = Some(value.clone());
             }
+            "--label" => {
+                let mut consumed = 0usize;
+                loop {
+                    let axis_index = i + 1 + consumed;
+                    let Some(axis) = args.get(axis_index) else {
+                        break;
+                    };
+                    if axis == "using" || axis.starts_with('-') {
+                        break;
+                    }
+                    let value = args
+                        .get(axis_index + 1)
+                        .ok_or_else(|| format!("missing label text for --label axis: {axis}"))?;
+                    match axis.as_str() {
+                        "x" => xlabel = Some(value.clone()),
+                        "y" => ylabel = Some(value.clone()),
+                        _ => {
+                            return Err(format!("invalid --label axis: {axis} (expected x or y)"));
+                        }
+                    }
+                    consumed += 2;
+                }
+                if consumed == 0 {
+                    return Err("missing axis for --label".to_string());
+                }
+                i += consumed;
+            }
             "--format" => {
                 let mut consumed = 0usize;
                 loop {
@@ -140,12 +163,38 @@ where
             "--xrange" => {
                 let (range, consumed) = parse_axis_range(&args, i + 1, "--xrange")?;
                 xrange = Some(range);
-                i = consumed;
+                i += consumed;
             }
             "--yrange" => {
                 let (range, consumed) = parse_axis_range(&args, i + 1, "--yrange")?;
                 yrange = Some(range);
-                i = consumed;
+                i += consumed;
+            }
+            "--range" => {
+                let mut consumed = 0usize;
+                loop {
+                    let axis_index = i + 1 + consumed;
+                    let Some(axis) = args.get(axis_index) else {
+                        break;
+                    };
+                    if axis == "using" || axis.starts_with('-') {
+                        break;
+                    }
+                    let (range, range_consumed) =
+                        parse_axis_range(&args, axis_index + 1, "--range")?;
+                    match axis.as_str() {
+                        "x" => xrange = Some(range),
+                        "y" => yrange = Some(range),
+                        _ => {
+                            return Err(format!("invalid --range axis: {axis} (expected x or y)"));
+                        }
+                    }
+                    consumed += 1 + range_consumed;
+                }
+                if consumed == 0 {
+                    return Err("missing axis for --range".to_string());
+                }
+                i += consumed;
             }
             "--logscale" => {
                 i += 1;
@@ -162,18 +211,19 @@ where
                 style = parse_style(value)?;
             }
             "--key" => {
-                show_key = true;
-                key_explicit = true;
-            }
-            "--no-key" => {
-                show_key = false;
+                i += 1;
+                let value = args
+                    .get(i)
+                    .ok_or_else(|| "missing value for --key".to_string())?;
+                show_key = parse_toggle(value, "--key")?;
                 key_explicit = true;
             }
             "--grid" => {
-                show_grid = true;
-            }
-            "--no-grid" => {
-                show_grid = false;
+                i += 1;
+                let value = args
+                    .get(i)
+                    .ok_or_else(|| "missing value for --grid".to_string())?;
+                show_grid = parse_toggle(value, "--grid")?;
             }
             "--comments" => {
                 let mut consumed = 0usize;
@@ -346,6 +396,16 @@ fn parse_logscale(value: &str) -> Result<LogScale, String> {
     }
 }
 
+fn parse_toggle(value: &str, flag: &str) -> Result<bool, String> {
+    match value {
+        "yes" | "y" | "on" | "true" => Ok(true),
+        "no" | "n" | "off" | "false" => Ok(false),
+        _ => Err(format!(
+            "invalid value for {flag}: {value} (expected yes/no, y/n, on/off, or true/false)"
+        )),
+    }
+}
+
 fn parse_axis_range(
     args: &[String],
     start: usize,
@@ -362,7 +422,7 @@ fn parse_axis_range(
             min: min.clone(),
             max: max.clone(),
         },
-        start + 1,
+        2,
     ))
 }
 

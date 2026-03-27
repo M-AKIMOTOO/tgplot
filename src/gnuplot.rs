@@ -4,6 +4,7 @@ use std::process::{Command, Stdio};
 use crate::model::{AxisValue, AxisValueKind, Config, LogScale, SeriesData, axis_value_kind};
 
 pub(crate) fn run_gnuplot(config: &Config, series: &[SeriesData]) -> Result<(), String> {
+    let terminal = preferred_terminal(config);
     let mut child = Command::new("gnuplot")
         .stdin(Stdio::piped())
         .stdout(Stdio::inherit())
@@ -16,7 +17,7 @@ pub(crate) fn run_gnuplot(config: &Config, series: &[SeriesData]) -> Result<(), 
         .take()
         .ok_or_else(|| "failed to open gnuplot stdin".to_string())?;
 
-    write_gnuplot_script(&mut stdin, config, series)?;
+    write_gnuplot_script_for_terminal(&mut stdin, config, series, terminal)?;
     drop(stdin);
 
     let status = child
@@ -30,10 +31,20 @@ pub(crate) fn run_gnuplot(config: &Config, series: &[SeriesData]) -> Result<(), 
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn write_gnuplot_script<W: Write>(
     mut out: W,
     config: &Config,
     series: &[SeriesData],
+) -> Result<(), String> {
+    write_gnuplot_script_for_terminal(&mut out, config, series, TerminalMode::BlockBraille)
+}
+
+fn write_gnuplot_script_for_terminal<W: Write>(
+    mut out: W,
+    config: &Config,
+    series: &[SeriesData],
+    terminal: TerminalMode,
 ) -> Result<(), String> {
     let x_kind = axis_value_kind(config.xformat.as_deref());
     let y_kind = axis_value_kind(config.yformat.as_deref());
@@ -51,21 +62,7 @@ pub(crate) fn write_gnuplot_script<W: Write>(
         (AxisValueKind::Number, AxisValueKind::Number) => None,
     };
 
-    if config.dumb {
-        writeln!(
-            out,
-            "set term dumb ansi size {},{}",
-            config.width, config.height
-        )
-        .map_err(io_error)?;
-    } else {
-        writeln!(
-            out,
-            "set term block braille ansi size {},{}",
-            config.width, config.height
-        )
-        .map_err(io_error)?;
-    }
+    writeln!(out, "{}", terminal_command(config, terminal)).map_err(io_error)?;
     if config.show_key {
         writeln!(out, "set key").map_err(io_error)?;
     } else {
@@ -157,6 +154,47 @@ pub(crate) fn write_gnuplot_script<W: Write>(
         writeln!(out, "e").map_err(io_error)?;
     }
     Ok(())
+}
+
+#[derive(Clone, Copy)]
+enum TerminalMode {
+    BlockBraille,
+    Dumb,
+}
+
+fn preferred_terminal(config: &Config) -> TerminalMode {
+    if config.dumb {
+        return TerminalMode::Dumb;
+    }
+    if supports_block_terminal() {
+        TerminalMode::BlockBraille
+    } else {
+        eprintln!("warning: gnuplot terminal 'block' is unavailable; falling back to 'dumb ansi'");
+        TerminalMode::Dumb
+    }
+}
+
+fn supports_block_terminal() -> bool {
+    Command::new("gnuplot")
+        .arg("-e")
+        .arg("set term block braille ansi size 10,10")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+fn terminal_command(config: &Config, terminal: TerminalMode) -> String {
+    match terminal {
+        TerminalMode::BlockBraille => {
+            format!(
+                "set term block braille ansi size {},{}",
+                config.width, config.height
+            )
+        }
+        TerminalMode::Dumb => format!("set term dumb ansi size {},{}", config.width, config.height),
+    }
 }
 
 fn write_axis_value<W: Write>(mut out: W, value: &AxisValue) -> io::Result<()> {

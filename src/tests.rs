@@ -403,6 +403,32 @@ fn parse_points_skips_comments() {
 }
 
 #[test]
+fn parse_points_skips_lines_containing_comment_markers() {
+    let points = parse_points(
+        "1 2\n12 # 34\n3 4\n",
+        Some(1),
+        2,
+        AxisValueKind::Number,
+        AxisValueKind::Number,
+        &["#".to_string()],
+    )
+    .unwrap();
+    assert_eq!(
+        points,
+        vec![
+            PlotPoint {
+                x: AxisValue::Number(1.0),
+                y: AxisValue::Number(2.0)
+            },
+            PlotPoint {
+                x: AxisValue::Number(3.0),
+                y: AxisValue::Number(4.0)
+            }
+        ]
+    );
+}
+
+#[test]
 fn parse_points_uses_row_index_for_single_column_mode() {
     let points = parse_points(
         "# comment\n10\n\n20\n",
@@ -572,7 +598,7 @@ fn numeric_xrange_still_requires_numeric_bounds() {
 #[test]
 fn parse_points_skips_multiple_comment_markers() {
     let points = parse_points(
-        "! skip\n% skip\n1 2\n3 4\n",
+        "! skip\n1 % 2\n3 4\n",
         Some(1),
         2,
         AxisValueKind::Number,
@@ -583,16 +609,10 @@ fn parse_points_skips_multiple_comment_markers() {
 
     assert_eq!(
         points,
-        vec![
-            PlotPoint {
-                x: AxisValue::Number(1.0),
-                y: AxisValue::Number(2.0)
-            },
-            PlotPoint {
-                x: AxisValue::Number(3.0),
-                y: AxisValue::Number(4.0)
-            }
-        ]
+        vec![PlotPoint {
+            x: AxisValue::Number(3.0),
+            y: AxisValue::Number(4.0)
+        }]
     );
 }
 

@@ -113,9 +113,7 @@ pub(crate) fn parse_points(
 }
 
 fn is_comment_line(line: &str, comment_markers: &[String]) -> bool {
-    comment_markers
-        .iter()
-        .any(|marker| line.starts_with(marker))
+    comment_markers.iter().any(|marker| line.contains(marker))
 }
 
 fn parse_axis_value(

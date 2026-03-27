@@ -48,10 +48,10 @@ set term block braille ansi
 ## Notes
 
 - Input is split on whitespace.
-- Empty lines and lines starting with `#` are ignored.
+- Empty lines and lines containing `#` are ignored.
 - `X` and `Y` are 1-based column numbers.
 - `using Y` plots a single column against the row index `1, 2, 3, ...`.
-- Comment lines starting with `#` are ignored by default.
+- Lines containing `#` are ignored by default.
 - `--comments # ! %` changes the ignore markers and can accept multiple markers.
 - Repeating `--in ... using ...` adds independent plot series.
 - `--in a.txt --in b.txt using 2` applies the same `using` clause to both files.

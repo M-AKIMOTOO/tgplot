@@ -26,7 +26,7 @@ Options:
   --style STYLE     Plot style: lines, points, linespoints (default: lines)
   --key VALUE       Legend on/off: yes/no, y/n, on/off, true/false
   --grid VALUE      Grid on/off: yes/no, y/n, on/off, true/false
-  --comments MARK... Ignore lines starting with these markers (default: #)
+  --comments MARK... Ignore lines containing these markers (default: #)
   --set CMD         Pass a raw gnuplot command, e.g. --set 'set samples 400'
   --detail          Show the full README-based guide
   --width N         Terminal width in characters

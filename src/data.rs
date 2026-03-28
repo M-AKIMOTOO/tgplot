@@ -8,11 +8,16 @@ use crate::model::{
 
 pub(crate) fn load_series(config: &Config) -> Result<Vec<SeriesData>, String> {
     let mut stdin_data = None;
-    let mut series = Vec::with_capacity(config.series.len());
+    let specs: Vec<SeriesSpec> = if config.series.is_empty() {
+        vec![SeriesSpec::auto(None)]
+    } else {
+        config.series.clone()
+    };
+    let mut series = Vec::with_capacity(specs.len());
     let x_kind = axis_value_kind(config.xformat.as_deref());
     let y_kind = axis_value_kind(config.yformat.as_deref());
 
-    for spec in &config.series {
+    for spec in &specs {
         let data = match spec.input.as_deref() {
             Some(path) => read_input(Some(path))?,
             None => {
@@ -25,10 +30,16 @@ pub(crate) fn load_series(config: &Config) -> Result<Vec<SeriesData>, String> {
                     .clone()
             }
         };
+        let resolved = resolve_series_spec(
+            &data,
+            spec,
+            config.delimiter.as_deref(),
+            &config.comment_markers,
+        )?;
         let points = parse_points(
             &data,
-            spec.x_column,
-            spec.y_column,
+            resolved.x_column,
+            resolved.y_column,
             x_kind,
             y_kind,
             config.delimiter.as_deref(),
@@ -41,12 +52,48 @@ pub(crate) fn load_series(config: &Config) -> Result<Vec<SeriesData>, String> {
             ));
         }
         series.push(SeriesData {
-            label: series_label(spec),
+            label: series_label(&resolved),
             points,
         });
     }
 
     Ok(series)
+}
+
+fn resolve_series_spec(
+    data: &str,
+    spec: &SeriesSpec,
+    delimiter: Option<&str>,
+    comment_markers: &[String],
+) -> Result<SeriesSpec, String> {
+    if !spec.is_auto() {
+        return Ok(spec.clone());
+    }
+
+    for raw in data.lines() {
+        let line = raw.trim();
+        if line.is_empty() || is_comment_line(line, comment_markers) {
+            continue;
+        }
+
+        let columns = split_columns(line, delimiter);
+        if columns.len() >= 2 {
+            return Ok(SeriesSpec {
+                input: spec.input.clone(),
+                x_column: Some(1),
+                y_column: 2,
+            });
+        }
+        if columns.len() == 1 {
+            return Ok(SeriesSpec {
+                input: spec.input.clone(),
+                x_column: None,
+                y_column: 1,
+            });
+        }
+    }
+
+    Ok(spec.clone())
 }
 
 fn read_input(input: Option<&str>) -> Result<String, String> {

@@ -1,6 +1,6 @@
 use crate::cli::parse_args;
 use crate::data::{parse_points, series_label};
-use crate::gnuplot::write_gnuplot_script;
+use crate::gnuplot::{parameter_summary, write_gnuplot_script};
 use crate::model::{
     AxisRange, AxisValue, AxisValueKind, CliAction, Config, LogScale, PlotPoint, PlotStyle,
     SeriesData, SeriesSpec, axis_value_kind,
@@ -20,7 +20,7 @@ fn parse_args_supports_requested_shape() {
         parse_args([
             "--in".to_string(),
             "text.txt".to_string(),
-            "using".to_string(),
+            "--columns".to_string(),
             "1".to_string(),
             "2".to_string(),
         ])
@@ -57,12 +57,64 @@ fn parse_args_supports_requested_shape() {
 }
 
 #[test]
-fn parse_args_accepts_options_after_using_clause() {
+fn parameter_summary_lists_key_plot_settings() {
+    let config = Config {
+        series: vec![SeriesSpec {
+            input: Some("text.txt".to_string()),
+            x_column: Some(1),
+            y_column: 2,
+        }],
+        title: Some("demo".to_string()),
+        xlabel: Some("Time".to_string()),
+        ylabel: Some("Flux".to_string()),
+        xformat: Some("%H:%M:%S".to_string()),
+        yformat: Some("%.5f".to_string()),
+        xrange: Some(AxisRange {
+            min: "0".to_string(),
+            max: "10".to_string(),
+        }),
+        yrange: None,
+        logscale: LogScale::Y,
+        style: PlotStyle::Points,
+        show_key: true,
+        show_grid: false,
+        delimiter: Some(",".to_string()),
+        comment_markers: vec!["#".to_string(), "!".to_string()],
+        extra_set_commands: Vec::new(),
+        width: 120,
+        height: 40,
+        dumb: true,
+    };
+    let series = vec![SeriesData {
+        label: "text.txt [1:2]".to_string(),
+        points: Vec::new(),
+    }];
+
+    let summary = parameter_summary(&config, &series);
+    assert!(summary.contains("series=text.txt [1:2]"));
+    assert!(summary.contains("title=demo"));
+    assert!(summary.contains("xlabel=Time"));
+    assert!(summary.contains("ylabel=Flux"));
+    assert!(summary.contains("format.x=%H:%M:%S"));
+    assert!(summary.contains("format.y=%.5f"));
+    assert!(summary.contains("range.x=[0:10]"));
+    assert!(summary.contains("logscale=y"));
+    assert!(summary.contains("style=points"));
+    assert!(summary.contains("key=on"));
+    assert!(summary.contains("grid=off"));
+    assert!(summary.contains("delimiter=,"));
+    assert!(summary.contains("comments=#,!"));
+    assert!(summary.contains("layout=120x40"));
+    assert!(summary.contains("terminal=dumb"));
+}
+
+#[test]
+fn parse_args_accepts_options_after_columns_clause() {
     let config = unwrap_plot(
         parse_args([
             "--in".to_string(),
             "text.txt".to_string(),
-            "using".to_string(),
+            "--columns".to_string(),
             "1".to_string(),
             "2".to_string(),
             "--style".to_string(),
@@ -79,14 +131,14 @@ fn parse_args_accepts_options_after_using_clause() {
 }
 
 #[test]
-fn parse_args_accepts_options_before_and_after_using_clause() {
+fn parse_args_accepts_options_before_and_after_columns_clause() {
     let config = unwrap_plot(
         parse_args([
             "--title".to_string(),
             "demo".to_string(),
             "--in".to_string(),
             "text.txt".to_string(),
-            "using".to_string(),
+            "--columns".to_string(),
             "2".to_string(),
             "4".to_string(),
             "--grid".to_string(),
@@ -128,7 +180,7 @@ fn parse_args_supports_gnuplot_style_axis_options() {
             "x".to_string(),
             "--set".to_string(),
             "set samples 400".to_string(),
-            "using".to_string(),
+            "--columns".to_string(),
             "1".to_string(),
             "2".to_string(),
         ])
@@ -169,7 +221,7 @@ fn parse_args_accepts_both_axis_formats_in_one_format_clause() {
             "%H:%M:%S".to_string(),
             "y".to_string(),
             "%e".to_string(),
-            "using".to_string(),
+            "--columns".to_string(),
             "1".to_string(),
             "2".to_string(),
         ])
@@ -189,7 +241,7 @@ fn parse_args_accepts_both_axis_labels_in_one_label_clause() {
             "Time".to_string(),
             "y".to_string(),
             "Flux".to_string(),
-            "using".to_string(),
+            "--columns".to_string(),
             "1".to_string(),
             "2".to_string(),
         ])
@@ -211,7 +263,7 @@ fn parse_args_accepts_both_axis_ranges_in_one_range_clause() {
             "y".to_string(),
             "-1".to_string(),
             "1".to_string(),
-            "using".to_string(),
+            "--columns".to_string(),
             "1".to_string(),
             "2".to_string(),
         ])
@@ -235,12 +287,12 @@ fn parse_args_accepts_both_axis_ranges_in_one_range_clause() {
 }
 
 #[test]
-fn parse_args_accepts_single_using_column() {
+fn parse_args_accepts_single_columns_value() {
     let config = unwrap_plot(
         parse_args([
             "--in".to_string(),
             "text.txt".to_string(),
-            "using".to_string(),
+            "--columns".to_string(),
             "2".to_string(),
         ])
         .unwrap(),
@@ -252,6 +304,35 @@ fn parse_args_accepts_single_using_column() {
 }
 
 #[test]
+fn parse_args_defaults_to_auto_columns_for_stdin() {
+    let config = unwrap_plot(parse_args(Vec::<String>::new()).unwrap());
+    assert_eq!(
+        config.series,
+        vec![SeriesSpec {
+            input: None,
+            x_column: None,
+            y_column: 0,
+        }]
+    );
+}
+
+#[test]
+fn parse_args_defaults_to_auto_columns_for_pending_inputs() {
+    let config = unwrap_plot(
+        parse_args(["--in".to_string(), "a.txt".to_string(), "b.txt".to_string()]).unwrap(),
+    );
+
+    assert_eq!(
+        config.series,
+        vec![
+            SeriesSpec::auto(Some("a.txt".to_string())),
+            SeriesSpec::auto(Some("b.txt".to_string()))
+        ]
+    );
+    assert!(config.show_key);
+}
+
+#[test]
 fn parse_args_accepts_multiple_comment_markers() {
     let config = unwrap_plot(
         parse_args([
@@ -259,7 +340,7 @@ fn parse_args_accepts_multiple_comment_markers() {
             "#".to_string(),
             "!".to_string(),
             "%".to_string(),
-            "using".to_string(),
+            "--columns".to_string(),
             "1".to_string(),
             "2".to_string(),
         ])
@@ -278,7 +359,7 @@ fn parse_args_accepts_delimiter() {
         parse_args([
             "--delimiter".to_string(),
             ",".to_string(),
-            "using".to_string(),
+            "--columns".to_string(),
             "1".to_string(),
             "2".to_string(),
         ])
@@ -289,6 +370,72 @@ fn parse_args_accepts_delimiter() {
 }
 
 #[test]
+fn parse_args_accepts_unique_long_option_prefixes() {
+    let config = unwrap_plot(
+        parse_args([
+            "--deli".to_string(),
+            ",".to_string(),
+            "--lay".to_string(),
+            "width".to_string(),
+            "90".to_string(),
+            "--col".to_string(),
+            "1".to_string(),
+            "2".to_string(),
+        ])
+        .unwrap(),
+    );
+
+    assert_eq!(config.delimiter, Some(",".to_string()));
+    assert_eq!(config.width, 90);
+    assert_eq!(config.series[0].x_column, Some(1));
+    assert_eq!(config.series[0].y_column, 2);
+}
+
+#[test]
+fn parse_args_reports_ambiguous_long_option_prefix() {
+    let error = parse_args(["--d".to_string()]).unwrap_err();
+    assert!(error.contains("ambiguous option: --d"));
+    assert!(error.contains("--detail"));
+    assert!(error.contains("--delimiter"));
+}
+
+#[test]
+fn parse_args_accepts_layout_width_and_height() {
+    let config = unwrap_plot(
+        parse_args([
+            "--layout".to_string(),
+            "width".to_string(),
+            "120".to_string(),
+            "height".to_string(),
+            "40".to_string(),
+            "--columns".to_string(),
+            "1".to_string(),
+            "2".to_string(),
+        ])
+        .unwrap(),
+    );
+
+    assert_eq!(config.width, 120);
+    assert_eq!(config.height, 40);
+}
+
+#[test]
+fn parse_args_accepts_layout_width_only() {
+    let config = unwrap_plot(
+        parse_args([
+            "--layout".to_string(),
+            "width".to_string(),
+            "90".to_string(),
+            "--columns".to_string(),
+            "2".to_string(),
+        ])
+        .unwrap(),
+    );
+
+    assert_eq!(config.width, 90);
+}
+
+#[test]
 fn parse_args_accepts_key_and_grid_toggle_values() {
     let config = unwrap_plot(
         parse_args([
@@ -296,7 +443,7 @@ fn parse_args_accepts_key_and_grid_toggle_values() {
             "yes".to_string(),
             "--grid".to_string(),
             "n".to_string(),
-            "using".to_string(),
+            "--columns".to_string(),
             "1".to_string(),
             "2".to_string(),
         ])
@@ -313,12 +460,12 @@ fn parse_args_supports_multiple_independent_input_series() {
         parse_args([
             "--in".to_string(),
             "a.txt".to_string(),
-            "using".to_string(),
+            "--columns".to_string(),
             "1".to_string(),
             "2".to_string(),
             "--in".to_string(),
             "b.txt".to_string(),
-            "using".to_string(),
+            "--columns".to_string(),
             "1".to_string(),
             "3".to_string(),
         ])
@@ -344,13 +491,13 @@ fn parse_args_supports_multiple_independent_input_series() {
 }
 
 #[test]
-fn parse_args_applies_single_using_clause_to_multiple_inputs() {
+fn parse_args_applies_single_columns_clause_to_multiple_inputs() {
     let config = unwrap_plot(
         parse_args([
             "--in".to_string(),
             "a.txt".to_string(),
             "b.txt".to_string(),
-            "using".to_string(),
+            "--columns".to_string(),
             "2".to_string(),
         ])
         .unwrap(),
@@ -382,7 +529,7 @@ fn parse_args_still_accepts_repeated_in_flags() {
             "a.txt".to_string(),
             "--in".to_string(),
             "b.txt".to_string(),
-            "using".to_string(),
+            "--columns".to_string(),
             "2".to_string(),
         ])
         .unwrap(),
@@ -472,6 +619,60 @@ fn parse_points_uses_row_index_for_single_column_mode() {
             }
         ]
     );
+}
+
+#[test]
+fn load_series_auto_detects_two_columns_as_1_to_2() {
+    let config = Config {
+        series: vec![SeriesSpec::auto(Some("/tmp/auto-two-cols.txt".to_string()))],
+        title: None,
+        xlabel: None,
+        ylabel: None,
+        xformat: None,
+        yformat: None,
+        xrange: None,
+        yrange: None,
+        logscale: LogScale::None,
+        style: PlotStyle::Lines,
+        show_key: false,
+        show_grid: true,
+        delimiter: None,
+        comment_markers: vec!["#".to_string()],
+        extra_set_commands: Vec::new(),
+        width: 80,
+        height: 24,
+        dumb: true,
+    };
+    std::fs::write("/tmp/auto-two-cols.txt", "1 2\n3 4\n").unwrap();
+    let series = crate::data::load_series(&config).unwrap();
+    assert_eq!(series[0].label, "/tmp/auto-two-cols.txt [1:2]");
+}
+
+#[test]
+fn load_series_auto_detects_one_column_as_row_index_to_1() {
+    let config = Config {
+        series: vec![SeriesSpec::auto(Some("/tmp/auto-one-col.txt".to_string()))],
+        title: None,
+        xlabel: None,
+        ylabel: None,
+        xformat: None,
+        yformat: None,
+        xrange: None,
+        yrange: None,
+        logscale: LogScale::None,
+        style: PlotStyle::Lines,
+        show_key: false,
+        show_grid: true,
+        delimiter: None,
+        comment_markers: vec!["#".to_string()],
+        extra_set_commands: Vec::new(),
+        width: 80,
+        height: 24,
+        dumb: true,
+    };
+    std::fs::write("/tmp/auto-one-col.txt", "10\n20\n").unwrap();
+    let series = crate::data::load_series(&config).unwrap();
+    assert_eq!(series[0].label, "/tmp/auto-one-col.txt [1]");
 }
 
 #[test]
@@ -608,13 +809,13 @@ fn numeric_xrange_still_requires_numeric_bounds() {
         "x".to_string(),
         "02:05:00".to_string(),
         "02:15:00".to_string(),
-        "using".to_string(),
+        "--columns".to_string(),
         "1".to_string(),
         "2".to_string(),
     ])
     .unwrap_err();
 
-    assert!(error.contains("invalid value for --xrange"));
+    assert!(error.contains("invalid value for --range x"));
 }
 
 #[test]

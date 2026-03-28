@@ -1,9 +1,13 @@
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 use std::process::{Command, Stdio};
 
 use crate::model::{AxisValue, AxisValueKind, Config, LogScale, SeriesData, axis_value_kind};
 
 pub(crate) fn run_gnuplot(config: &Config, series: &[SeriesData]) -> Result<(), String> {
+    if io::stdout().is_terminal() {
+        println!("{}", parameter_summary(config, series));
+    }
+
     let terminal = preferred_terminal(config);
     let mut child = Command::new("gnuplot")
         .stdin(Stdio::piped())
@@ -222,4 +226,69 @@ fn escape_gnuplot(text: &str) -> String {
 
 fn io_error(error: io::Error) -> String {
     format!("failed to write gnuplot input: {error}")
+}
+
+pub(crate) fn parameter_summary(config: &Config, series: &[SeriesData]) -> String {
+    let mut parts = Vec::new();
+
+    if !series.is_empty() {
+        let labels = series
+            .iter()
+            .map(|series| series.label.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        parts.push(format!("series={labels}"));
+    }
+    if let Some(title) = &config.title {
+        parts.push(format!("title={title}"));
+    }
+    if let Some(xlabel) = &config.xlabel {
+        parts.push(format!("xlabel={xlabel}"));
+    }
+    if let Some(ylabel) = &config.ylabel {
+        parts.push(format!("ylabel={ylabel}"));
+    }
+    if let Some(xformat) = &config.xformat {
+        parts.push(format!("format.x={xformat}"));
+    }
+    if let Some(yformat) = &config.yformat {
+        parts.push(format!("format.y={yformat}"));
+    }
+    if let Some(xrange) = &config.xrange {
+        parts.push(format!("range.x=[{}:{}]", xrange.min, xrange.max));
+    }
+    if let Some(yrange) = &config.yrange {
+        parts.push(format!("range.y=[{}:{}]", yrange.min, yrange.max));
+    }
+    if config.logscale != LogScale::None {
+        let axis = match config.logscale {
+            LogScale::None => "",
+            LogScale::X => "x",
+            LogScale::Y => "y",
+            LogScale::XY => "xy",
+        };
+        parts.push(format!("logscale={axis}"));
+    }
+    parts.push(format!("style={}", config.style.gnuplot_name()));
+    parts.push(format!(
+        "key={}",
+        if config.show_key { "on" } else { "off" }
+    ));
+    parts.push(format!(
+        "grid={}",
+        if config.show_grid { "on" } else { "off" }
+    ));
+    if let Some(delimiter) = &config.delimiter {
+        parts.push(format!("delimiter={delimiter}"));
+    }
+    if config.comment_markers != ["#".to_string()] {
+        parts.push(format!("comments={}", config.comment_markers.join(",")));
+    }
+    parts.push(format!("layout={}x{}", config.width, config.height));
+    parts.push(format!(
+        "terminal={}",
+        if config.dumb { "dumb" } else { "auto" }
+    ));
+
+    format!("params: {}", parts.join(" | "))
 }

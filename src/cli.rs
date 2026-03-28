@@ -1,5 +1,7 @@
 use std::env;
 
+use crossterm::terminal;
+
 use crate::model::{
     AxisRange, AxisValueKind, CliAction, Config, LogScale, PlotStyle, SeriesSpec, axis_value_kind,
 };
@@ -8,16 +10,20 @@ pub(crate) const HELP: &str = "\
 tgplot - plot text columns in the terminal using gnuplot
 
 Usage:
-  tgplot --in FILE using X Y
-  tgplot --in FILE... using X Y
-  tgplot --in FILE using Y
-  tgplot --in A using X Y --in B using X Y
-  tgplot --in A --in B using Y
-  tgplot using X Y < data.txt
-  tgplot using Y < data.txt
+  tgplot
+  tgplot --in FILE --columns X Y
+  tgplot --in FILE... --columns X Y
+  tgplot --in FILE --columns Y
+  tgplot --in A --columns X Y --in B --columns X Y
+  tgplot --in A --in B --columns Y
+  tgplot --columns X Y < data.txt
+  tgplot --columns Y < data.txt
 
 Options:
   --in FILE...      Read one or more input files. Use - for stdin
+  --comments MARK... Ignore lines containing these markers (default: #)
+  --delimiter TXT   Split input on this delimiter instead of whitespace
+  --columns N...    Plot column N against row index, or X Y for explicit axes
   --title TEXT      Set the plot title
   --label AXIS TXT... Set axis labels for x or y
   --format AXIS FMT... Set axis format for x or y; accepts x/y pairs and time-like formats enable time data
@@ -26,26 +32,40 @@ Options:
   --style STYLE     Plot style: lines, points, linespoints (default: lines)
   --key VALUE       Legend on/off: yes/no, y/n, on/off, true/false
   --grid VALUE      Grid on/off: yes/no, y/n, on/off, true/false
-  --delimiter TXT   Split input on this delimiter instead of whitespace
-  --comments MARK... Ignore lines containing these markers (default: #)
+  --layout KEY N... Set layout values such as width/height (defaults to the current terminal size)
+  --dumb            Use gnuplot dumb terminal instead of block braille
   --set CMD         Pass a raw gnuplot command, e.g. --set 'set samples 400'
   --detail          Show the full README-based guide
-  --width N         Terminal width in characters
-  --height N        Terminal height in characters
-  --dumb            Use gnuplot dumb terminal instead of block braille
   -h, --help        Show this help
 
 Use --detail for examples and the full README-based guide.
 ";
+
+const LONG_OPTIONS: &[&str] = &[
+    "--help",
+    "--detail",
+    "--in",
+    "--title",
+    "--label",
+    "--format",
+    "--range",
+    "--logscale",
+    "--style",
+    "--key",
+    "--grid",
+    "--delimiter",
+    "--comments",
+    "--columns",
+    "--layout",
+    "--set",
+    "--dumb",
+];
 
 pub(crate) fn parse_args<I>(args: I) -> Result<CliAction, String>
 where
     I: IntoIterator<Item = String>,
 {
     let args: Vec<String> = args.into_iter().collect();
-    if args.is_empty() {
-        return Ok(CliAction::Help);
-    }
 
     let mut series = Vec::new();
     let mut pending_inputs = Vec::new();
@@ -63,20 +83,20 @@ where
     let mut delimiter = None;
     let mut comment_markers = vec!["#".to_string()];
     let mut extra_set_commands = Vec::new();
-    let mut width = env_size("COLUMNS", 100);
-    let mut height = env_size("LINES", 30).saturating_sub(2).max(10);
+    let (mut width, mut height) = default_layout();
     let mut dumb = false;
     let mut key_explicit = false;
 
     let mut i = 0;
     while i < args.len() {
-        match args[i].as_str() {
+        let option = resolve_long_option(&args[i])?;
+        match option.as_str() {
             "-h" | "--help" => return Ok(CliAction::Help),
             "--detail" => return Ok(CliAction::Detail),
             "--in" => {
                 let mut consumed = 0usize;
                 while let Some(value) = args.get(i + 1 + consumed) {
-                    if value == "using" || value.starts_with('-') {
+                    if value.starts_with('-') {
                         break;
                     }
                     pending_inputs.push(value.clone());
@@ -94,20 +114,6 @@ where
                     .ok_or_else(|| "missing value for --title".to_string())?;
                 title = Some(value.clone());
             }
-            "--xlabel" => {
-                i += 1;
-                let value = args
-                    .get(i)
-                    .ok_or_else(|| "missing value for --xlabel".to_string())?;
-                xlabel = Some(value.clone());
-            }
-            "--ylabel" => {
-                i += 1;
-                let value = args
-                    .get(i)
-                    .ok_or_else(|| "missing value for --ylabel".to_string())?;
-                ylabel = Some(value.clone());
-            }
             "--label" => {
                 let mut consumed = 0usize;
                 loop {
@@ -115,7 +121,7 @@ where
                     let Some(axis) = args.get(axis_index) else {
                         break;
                     };
-                    if axis == "using" || axis.starts_with('-') {
+                    if axis.starts_with('-') {
                         break;
                     }
                     let value = args
@@ -142,7 +148,7 @@ where
                     let Some(axis) = args.get(axis_index) else {
                         break;
                     };
-                    if axis == "using" || axis.starts_with('-') {
+                    if axis.starts_with('-') {
                         break;
                     }
                     let format = args.get(axis_index + 1).ok_or_else(|| {
@@ -162,16 +168,6 @@ where
                 }
                 i += consumed;
             }
-            "--xrange" => {
-                let (range, consumed) = parse_axis_range(&args, i + 1, "--xrange")?;
-                xrange = Some(range);
-                i += consumed;
-            }
-            "--yrange" => {
-                let (range, consumed) = parse_axis_range(&args, i + 1, "--yrange")?;
-                yrange = Some(range);
-                i += consumed;
-            }
             "--range" => {
                 let mut consumed = 0usize;
                 loop {
@@ -179,7 +175,7 @@ where
                     let Some(axis) = args.get(axis_index) else {
                         break;
                     };
-                    if axis == "using" || axis.starts_with('-') {
+                    if axis.starts_with('-') {
                         break;
                     }
                     let (range, range_consumed) =
@@ -241,7 +237,7 @@ where
                 let mut consumed = 0usize;
                 let mut markers = Vec::new();
                 while let Some(value) = args.get(i + 1 + consumed) {
-                    if value == "using" || value.starts_with('-') {
+                    if value.starts_with('-') {
                         break;
                     }
                     markers.push(value.clone());
@@ -260,27 +256,42 @@ where
                     .ok_or_else(|| "missing value for --set".to_string())?;
                 extra_set_commands.push(value.clone());
             }
-            "--width" => {
-                i += 1;
-                let value = args
-                    .get(i)
-                    .ok_or_else(|| "missing value for --width".to_string())?;
-                width = parse_positive_usize(value, "--width")?;
-            }
-            "--height" => {
-                i += 1;
-                let value = args
-                    .get(i)
-                    .ok_or_else(|| "missing value for --height".to_string())?;
-                height = parse_positive_usize(value, "--height")?;
+            "--layout" => {
+                let mut consumed = 0usize;
+                loop {
+                    let key_index = i + 1 + consumed;
+                    let Some(key) = args.get(key_index) else {
+                        break;
+                    };
+                    if key.starts_with('-') {
+                        break;
+                    }
+                    let value = args
+                        .get(key_index + 1)
+                        .ok_or_else(|| format!("missing value for --layout key: {key}"))?;
+                    match key.as_str() {
+                        "width" => width = parse_positive_usize(value, "--layout width")?,
+                        "height" => height = parse_positive_usize(value, "--layout height")?,
+                        _ => {
+                            return Err(format!(
+                                "invalid --layout key: {key} (expected width or height)"
+                            ));
+                        }
+                    }
+                    consumed += 2;
+                }
+                if consumed == 0 {
+                    return Err("missing key for --layout".to_string());
+                }
+                i += consumed;
             }
             "--dumb" => {
                 dumb = true;
             }
-            "using" => {
+            "--columns" => {
                 let first = args
                     .get(i + 1)
-                    .ok_or_else(|| format!("missing column after using\n\n{HELP}"))?;
+                    .ok_or_else(|| format!("missing column after --columns\n\n{HELP}"))?;
                 let second = args.get(i + 2);
                 let inputs = if pending_inputs.is_empty() {
                     vec![None]
@@ -333,21 +344,23 @@ where
     }
 
     if !pending_inputs.is_empty() {
-        return Err(format!("missing using clause for --in\n\n{HELP}"));
+        for input in pending_inputs.drain(..) {
+            series.push(SeriesSpec::auto(Some(input)));
+        }
     }
     if series.is_empty() {
-        return Err(format!("missing using X Y clause\n\n{HELP}"));
+        series.push(SeriesSpec::auto(None));
     }
     if axis_value_kind(xformat.as_deref()) == AxisValueKind::Number {
         if let Some(xrange) = &xrange {
-            validate_numeric_range_bound(&xrange.min, "--xrange")?;
-            validate_numeric_range_bound(&xrange.max, "--xrange")?;
+            validate_numeric_range_bound(&xrange.min, "--range x")?;
+            validate_numeric_range_bound(&xrange.max, "--range x")?;
         }
     }
     if axis_value_kind(yformat.as_deref()) == AxisValueKind::Number {
         if let Some(yrange) = &yrange {
-            validate_numeric_range_bound(&yrange.min, "--yrange")?;
-            validate_numeric_range_bound(&yrange.max, "--yrange")?;
+            validate_numeric_range_bound(&yrange.min, "--range y")?;
+            validate_numeric_range_bound(&yrange.max, "--range y")?;
         }
     }
     if !key_explicit && series.len() > 1 {
@@ -455,4 +468,40 @@ fn env_size(name: &str, fallback: usize) -> usize {
         .and_then(|value| value.parse::<usize>().ok())
         .filter(|&value| value > 0)
         .unwrap_or(fallback)
+}
+
+fn default_layout() -> (usize, usize) {
+    if let Ok((width, height)) = terminal::size() {
+        let width = usize::from(width).max(1);
+        let height = usize::from(height).saturating_sub(2).max(10);
+        return (width, height);
+    }
+
+    (
+        env_size("COLUMNS", 100),
+        env_size("LINES", 30).saturating_sub(2).max(10),
+    )
+}
+
+fn resolve_long_option(option: &str) -> Result<String, String> {
+    if !option.starts_with("--") {
+        return Ok(option.to_string());
+    }
+    if LONG_OPTIONS.contains(&option) {
+        return Ok(option.to_string());
+    }
+
+    let matches: Vec<&str> = LONG_OPTIONS
+        .iter()
+        .copied()
+        .filter(|candidate| candidate.starts_with(option))
+        .collect();
+    match matches.len() {
+        0 => Ok(option.to_string()),
+        1 => Ok(matches[0].to_string()),
+        _ => Err(format!(
+            "ambiguous option: {option} (could be {})\n\n{HELP}",
+            matches.join(", ")
+        )),
+    }
 }

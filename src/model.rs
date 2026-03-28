@@ -27,6 +27,20 @@ pub(crate) struct SeriesSpec {
     pub(crate) y_column: usize,
 }
 
+impl SeriesSpec {
+    pub(crate) fn auto(input: Option<String>) -> Self {
+        Self {
+            input,
+            x_column: None,
+            y_column: 0,
+        }
+    }
+
+    pub(crate) fn is_auto(self: &Self) -> bool {
+        self.y_column == 0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct SeriesData {
     pub(crate) label: String,

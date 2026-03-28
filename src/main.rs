@@ -8,6 +8,7 @@ mod model;
 mod tests;
 
 use std::env;
+use std::io::{self, IsTerminal};
 use std::process;
 
 use cli::{HELP, parse_args};
@@ -32,7 +33,14 @@ fn main() {
 }
 
 fn run() -> Result<(), String> {
-    match parse_args(env::args().skip(1))? {
+    let args: Vec<String> = env::args().skip(1).collect();
+    if args.is_empty() && io::stdin().is_terminal() {
+        print!("{BANNER}\n");
+        print!("{HELP}");
+        return Ok(());
+    }
+
+    match parse_args(args)? {
         CliAction::Help => {
             print!("{BANNER}\n");
             print!("{HELP}");

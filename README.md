@@ -5,21 +5,22 @@
 It is intended for commands such as:
 
 ```bash
-tgplot --in text.txt using 1 2
-tgplot --in a.txt b.txt using 1 2
-tgplot --in text.txt using 2
-tgplot --in a.txt using 1 2 --in b.txt using 1 2
-tgplot --in a.txt --in b.txt using 2
-tgplot --in text.txt using 1 2 --format x '%Y-%m-%dT%H:%M:%S'
-tgplot --in text.txt using 1 2 --format y '%.5f'
-tgplot using 1 2 < text.txt
-tgplot using 2 < text.txt
-tgplot using 1 2 --in text.txt --style points
-tgplot --in data.csv using 1 2 --delimiter ','
-tgplot --in text.txt using 1 2 --range x 0 10 y -10 10
-tgplot --in text.txt using 1 2 --logscale y
-tgplot --in text.txt using 1 2 --label x Time y Flux
-tgplot --in text.txt using 1 2 --set 'set samples 400'
+tgplot < text.txt
+tgplot --in text.txt --columns 1 2
+tgplot --in a.txt b.txt --columns 1 2
+tgplot --in text.txt --columns 2
+tgplot --in a.txt --columns 1 2 --in b.txt --columns 1 2
+tgplot --in a.txt --in b.txt --columns 2
+tgplot --in text.txt --columns 1 2 --format x '%Y-%m-%dT%H:%M:%S'
+tgplot --in text.txt --columns 1 2 --format y '%.5f'
+tgplot --columns 1 2 < text.txt
+tgplot --columns 2 < text.txt
+tgplot --columns 1 2 --in text.txt --style points
+tgplot --in data.csv --columns 1 2 --delimiter ','
+tgplot --in text.txt --columns 1 2 --range x 0 10 y -10 10
+tgplot --in text.txt --columns 1 2 --logscale y
+tgplot --in text.txt --columns 1 2 --label x Time y Flux
+tgplot --in text.txt --columns 1 2 --set 'set samples 400'
 ```
 
 By default it uses a Unicode terminal plot:
@@ -31,7 +32,9 @@ set term block braille ansi
 ## Options
 
 - `--in FILE...`
-- `using X Y`
+- `--comments MARK...`
+- `--delimiter TXT`
+- `--columns N...`
 - `--title TEXT`
 - `--label x|y TEXT`
 - `--format x|y FORMAT`
@@ -40,26 +43,28 @@ set term block braille ansi
 - `--style lines|points|linespoints`
 - `--key yes|no`
 - `--grid yes|no`
-- `--delimiter TXT`
-- `--comments MARK...`
-- `--set CMD`
-- `--width N`
-- `--height N`
+- `--layout width|height N`
 - `--dumb`
+- `--set CMD`
 
 ## Notes
 
+- By default, `tgplot` uses the current terminal size and `--layout` overrides it.
 - Input is split on whitespace by default.
 - `--delimiter ','` lets `tgplot` read csv-like input.
 - Empty lines and lines containing `#` are ignored.
 - `X` and `Y` are 1-based column numbers.
-- `using Y` plots a single column against the row index `1, 2, 3, ...`.
+- If `--columns` is omitted, `tgplot` inspects the first plottable row.
+- With two or more columns, omitted `--columns` behaves like `--columns 1 2`.
+- With one column, omitted `--columns` behaves like `--columns 1` against the row index.
+- `--columns Y` plots a single column against the row index `1, 2, 3, ...`.
 - Lines containing `#` are ignored by default.
 - `--comments # ! %` changes the ignore markers and can accept multiple markers.
-- Repeating `--in ... using ...` adds independent plot series.
-- `--in a.txt --in b.txt using 2` applies the same `using` clause to both files.
-- `--in a.txt b.txt using 2` is the shorter equivalent.
-- Options may appear before or after `using X Y`.
+- Repeating `--in ... --columns ...` adds independent plot series.
+- `--in a.txt --in b.txt --columns 2` applies the same `--columns` clause to both files.
+- `--in a.txt b.txt --columns 2` is the shorter equivalent.
+- Options may appear before or after `--columns X Y`.
+- `--layout width 100` and `--layout width 100 height 50` are both accepted.
 - `--label x 'Time' y 'Flux'` can set both axis labels in one `--label`.
 - `--format x '%H:%M:%S' y '%e'` can set both axis formats in one `--format`.
 - `--range x 0 10 y -1 1` can set both axis ranges in one `--range`.

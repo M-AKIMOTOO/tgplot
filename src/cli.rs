@@ -23,7 +23,7 @@ Options:
   --in FILE...      Read one or more input files. Use - for stdin
   --comments MARK... Ignore lines containing these markers (default: #)
   --delimiter TXT   Split input on this delimiter instead of whitespace
-  --columns N...    Plot column N against row index, or X Y for explicit axes
+  --columns N...    Plot Y against row index, X Y, or X Y1 Y2 ... for multiple series
   --title TEXT      Set the plot title
   --label AXIS TXT... Set axis labels for x or y
   --format AXIS FMT... Set axis format for x or y; accepts x/y pairs and time-like formats enable time data
@@ -289,40 +289,25 @@ where
                 dumb = true;
             }
             "--columns" => {
-                let first = args
-                    .get(i + 1)
-                    .ok_or_else(|| format!("missing column after --columns\n\n{HELP}"))?;
-                let second = args.get(i + 2);
+                let mut consumed = 0usize;
+                let mut values = Vec::new();
+                while let Some(value) = args.get(i + 1 + consumed) {
+                    if value.starts_with('-') {
+                        break;
+                    }
+                    values.push(value.clone());
+                    consumed += 1;
+                }
+                if values.is_empty() {
+                    return Err(format!("missing column after --columns\n\n{HELP}"));
+                }
                 let inputs = if pending_inputs.is_empty() {
                     vec![None]
                 } else {
                     pending_inputs.drain(..).map(Some).collect()
                 };
-                if let Some(value) = second {
-                    if !value.starts_with('-') {
-                        let x_column = Some(parse_positive_usize(first, "X column")?);
-                        let y_column = parse_positive_usize(value, "Y column")?;
-                        for input in inputs {
-                            series.push(SeriesSpec {
-                                input,
-                                x_column,
-                                y_column,
-                            });
-                        }
-                        i += 2;
-                    } else {
-                        let y_column = parse_positive_usize(first, "Y column")?;
-                        for input in inputs {
-                            series.push(SeriesSpec {
-                                input,
-                                x_column: None,
-                                y_column,
-                            });
-                        }
-                        i += 1;
-                    }
-                } else {
-                    let y_column = parse_positive_usize(first, "Y column")?;
+                if values.len() == 1 {
+                    let y_column = parse_positive_usize(&values[0], "Y column")?;
                     for input in inputs {
                         series.push(SeriesSpec {
                             input,
@@ -330,8 +315,23 @@ where
                             y_column,
                         });
                     }
-                    i += 1;
+                } else {
+                    let x_column = Some(parse_positive_usize(&values[0], "X column")?);
+                    let y_columns = values[1..]
+                        .iter()
+                        .map(|value| parse_positive_usize(value, "Y column"))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    for input in inputs {
+                        for &y_column in &y_columns {
+                            series.push(SeriesSpec {
+                                input: input.clone(),
+                                x_column,
+                                y_column,
+                            });
+                        }
+                    }
                 }
+                i += consumed;
             }
             other if other.starts_with('-') => {
                 return Err(format!("unknown option: {other}\n\n{HELP}"));

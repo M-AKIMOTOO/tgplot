@@ -304,6 +304,44 @@ fn parse_args_accepts_single_columns_value() {
 }
 
 #[test]
+fn parse_args_accepts_multiple_y_columns_with_shared_x() {
+    let config = unwrap_plot(
+        parse_args([
+            "--in".to_string(),
+            "text.txt".to_string(),
+            "--columns".to_string(),
+            "1".to_string(),
+            "2".to_string(),
+            "3".to_string(),
+            "4".to_string(),
+        ])
+        .unwrap(),
+    );
+
+    assert_eq!(
+        config.series,
+        vec![
+            SeriesSpec {
+                input: Some("text.txt".to_string()),
+                x_column: Some(1),
+                y_column: 2,
+            },
+            SeriesSpec {
+                input: Some("text.txt".to_string()),
+                x_column: Some(1),
+                y_column: 3,
+            },
+            SeriesSpec {
+                input: Some("text.txt".to_string()),
+                x_column: Some(1),
+                y_column: 4,
+            },
+        ]
+    );
+    assert!(config.show_key);
+}
+
+#[test]
 fn parse_args_defaults_to_auto_columns_for_stdin() {
     let config = unwrap_plot(parse_args(Vec::<String>::new()).unwrap());
     assert_eq!(
@@ -515,6 +553,49 @@ fn parse_args_applies_single_columns_clause_to_multiple_inputs() {
                 input: Some("b.txt".to_string()),
                 x_column: None,
                 y_column: 2,
+            },
+        ]
+    );
+    assert!(config.show_key);
+}
+
+#[test]
+fn parse_args_applies_multiple_y_columns_to_multiple_inputs() {
+    let config = unwrap_plot(
+        parse_args([
+            "--in".to_string(),
+            "a.txt".to_string(),
+            "b.txt".to_string(),
+            "--columns".to_string(),
+            "1".to_string(),
+            "2".to_string(),
+            "3".to_string(),
+        ])
+        .unwrap(),
+    );
+
+    assert_eq!(
+        config.series,
+        vec![
+            SeriesSpec {
+                input: Some("a.txt".to_string()),
+                x_column: Some(1),
+                y_column: 2,
+            },
+            SeriesSpec {
+                input: Some("a.txt".to_string()),
+                x_column: Some(1),
+                y_column: 3,
+            },
+            SeriesSpec {
+                input: Some("b.txt".to_string()),
+                x_column: Some(1),
+                y_column: 2,
+            },
+            SeriesSpec {
+                input: Some("b.txt".to_string()),
+                x_column: Some(1),
+                y_column: 3,
             },
         ]
     );

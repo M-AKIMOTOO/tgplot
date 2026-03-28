@@ -7,6 +7,7 @@ It is intended for commands such as:
 ```bash
 tgplot < text.txt
 tgplot --in text.txt --columns 1 2
+tgplot --in text.txt --columns 1 2 3 4
 tgplot --in a.txt b.txt --columns 1 2
 tgplot --in text.txt --columns 2
 tgplot --in a.txt --columns 1 2 --in b.txt --columns 1 2
@@ -54,6 +55,7 @@ set term block braille ansi
 - `--delimiter ','` lets `tgplot` read csv-like input.
 - Empty lines and lines containing `#` are ignored.
 - `X` and `Y` are 1-based column numbers.
+- `--columns X Y1 Y2 ...` plots multiple Y columns against the same X column.
 - If `--columns` is omitted, `tgplot` inspects the first plottable row.
 - With two or more columns, omitted `--columns` behaves like `--columns 1 2`.
 - With one column, omitted `--columns` behaves like `--columns 1` against the row index.

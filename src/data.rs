@@ -31,6 +31,7 @@ pub(crate) fn load_series(config: &Config) -> Result<Vec<SeriesData>, String> {
             spec.y_column,
             x_kind,
             y_kind,
+            config.delimiter.as_deref(),
             &config.comment_markers,
         )?;
         if points.is_empty() {
@@ -78,6 +79,7 @@ pub(crate) fn parse_points(
     y_column: usize,
     x_kind: AxisValueKind,
     y_kind: AxisValueKind,
+    delimiter: Option<&str>,
     comment_markers: &[String],
 ) -> Result<Vec<PlotPoint>, String> {
     let mut points = Vec::new();
@@ -89,7 +91,7 @@ pub(crate) fn parse_points(
             continue;
         }
 
-        let columns: Vec<&str> = line.split_whitespace().collect();
+        let columns = split_columns(line, delimiter);
         let y = columns
             .get(y_column - 1)
             .ok_or_else(|| format!("line {} does not have column {}", line_no + 1, y_column))?;
@@ -114,6 +116,13 @@ pub(crate) fn parse_points(
 
 fn is_comment_line(line: &str, comment_markers: &[String]) -> bool {
     comment_markers.iter().any(|marker| line.contains(marker))
+}
+
+fn split_columns<'a>(line: &'a str, delimiter: Option<&str>) -> Vec<&'a str> {
+    match delimiter {
+        Some(delimiter) => line.split(delimiter).map(str::trim).collect(),
+        None => line.split_whitespace().collect(),
+    }
 }
 
 fn parse_axis_value(

@@ -46,6 +46,7 @@ fn parse_args_supports_requested_shape() {
             style: PlotStyle::Lines,
             show_key: false,
             show_grid: true,
+            delimiter: None,
             comment_markers: vec!["#".to_string()],
             extra_set_commands: Vec::new(),
             width: config.width,
@@ -272,6 +273,22 @@ fn parse_args_accepts_multiple_comment_markers() {
 }
 
 #[test]
+fn parse_args_accepts_delimiter() {
+    let config = unwrap_plot(
+        parse_args([
+            "--delimiter".to_string(),
+            ",".to_string(),
+            "using".to_string(),
+            "1".to_string(),
+            "2".to_string(),
+        ])
+        .unwrap(),
+    );
+
+    assert_eq!(config.delimiter, Some(",".to_string()));
+}
+
+#[test]
 fn parse_args_accepts_key_and_grid_toggle_values() {
     let config = unwrap_plot(
         parse_args([
@@ -384,6 +401,7 @@ fn parse_points_skips_comments() {
         2,
         AxisValueKind::Number,
         AxisValueKind::Number,
+        None,
         &["#".to_string()],
     )
     .unwrap();
@@ -410,6 +428,7 @@ fn parse_points_skips_lines_containing_comment_markers() {
         2,
         AxisValueKind::Number,
         AxisValueKind::Number,
+        None,
         &["#".to_string()],
     )
     .unwrap();
@@ -436,6 +455,7 @@ fn parse_points_uses_row_index_for_single_column_mode() {
         1,
         AxisValueKind::Number,
         AxisValueKind::Number,
+        None,
         &["#".to_string()],
     )
     .unwrap();
@@ -462,6 +482,7 @@ fn parse_points_accepts_time_values_on_x_axis() {
         2,
         AxisValueKind::Time,
         AxisValueKind::Number,
+        None,
         &["#".to_string()],
     )
     .unwrap();
@@ -512,6 +533,7 @@ fn gnuplot_script_uses_block_terminal_by_default() {
         style: PlotStyle::LinesPoints,
         show_key: true,
         show_grid: false,
+        delimiter: None,
         comment_markers: vec!["#".to_string()],
         extra_set_commands: vec!["set samples 400".to_string()],
         width: 80,
@@ -603,6 +625,7 @@ fn parse_points_skips_multiple_comment_markers() {
         2,
         AxisValueKind::Number,
         AxisValueKind::Number,
+        None,
         &["#".to_string(), "!".to_string(), "%".to_string()],
     )
     .unwrap();
@@ -613,6 +636,34 @@ fn parse_points_skips_multiple_comment_markers() {
             x: AxisValue::Number(3.0),
             y: AxisValue::Number(4.0)
         }]
+    );
+}
+
+#[test]
+fn parse_points_accepts_custom_delimiter() {
+    let points = parse_points(
+        "1,2\n3,4\n",
+        Some(1),
+        2,
+        AxisValueKind::Number,
+        AxisValueKind::Number,
+        Some(","),
+        &["#".to_string()],
+    )
+    .unwrap();
+
+    assert_eq!(
+        points,
+        vec![
+            PlotPoint {
+                x: AxisValue::Number(1.0),
+                y: AxisValue::Number(2.0)
+            },
+            PlotPoint {
+                x: AxisValue::Number(3.0),
+                y: AxisValue::Number(4.0)
+            }
+        ]
     );
 }
 

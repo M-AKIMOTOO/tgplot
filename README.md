@@ -15,6 +15,7 @@ tgplot --in text.txt using 1 2 --format y '%.5f'
 tgplot using 1 2 < text.txt
 tgplot using 2 < text.txt
 tgplot using 1 2 --in text.txt --style points
+tgplot --in data.csv using 1 2 --delimiter ','
 tgplot --in text.txt using 1 2 --range x 0 10 y -10 10
 tgplot --in text.txt using 1 2 --logscale y
 tgplot --in text.txt using 1 2 --label x Time y Flux
@@ -39,6 +40,7 @@ set term block braille ansi
 - `--style lines|points|linespoints`
 - `--key yes|no`
 - `--grid yes|no`
+- `--delimiter TXT`
 - `--comments MARK...`
 - `--set CMD`
 - `--width N`
@@ -47,7 +49,8 @@ set term block braille ansi
 
 ## Notes
 
-- Input is split on whitespace.
+- Input is split on whitespace by default.
+- `--delimiter ','` lets `tgplot` read csv-like input.
 - Empty lines and lines containing `#` are ignored.
 - `X` and `Y` are 1-based column numbers.
 - `using Y` plots a single column against the row index `1, 2, 3, ...`.

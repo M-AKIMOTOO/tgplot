@@ -12,6 +12,7 @@ pub(crate) struct Config {
     pub(crate) style: PlotStyle,
     pub(crate) show_key: bool,
     pub(crate) show_grid: bool,
+    pub(crate) delimiter: Option<String>,
     pub(crate) comment_markers: Vec<String>,
     pub(crate) extra_set_commands: Vec<String>,
     pub(crate) width: usize,

@@ -26,6 +26,7 @@ Options:
   --style STYLE     Plot style: lines, points, linespoints (default: lines)
   --key VALUE       Legend on/off: yes/no, y/n, on/off, true/false
   --grid VALUE      Grid on/off: yes/no, y/n, on/off, true/false
+  --delimiter TXT   Split input on this delimiter instead of whitespace
   --comments MARK... Ignore lines containing these markers (default: #)
   --set CMD         Pass a raw gnuplot command, e.g. --set 'set samples 400'
   --detail          Show the full README-based guide
@@ -59,6 +60,7 @@ where
     let mut style = PlotStyle::Lines;
     let mut show_key = false;
     let mut show_grid = true;
+    let mut delimiter = None;
     let mut comment_markers = vec!["#".to_string()];
     let mut extra_set_commands = Vec::new();
     let mut width = env_size("COLUMNS", 100);
@@ -225,6 +227,16 @@ where
                     .ok_or_else(|| "missing value for --grid".to_string())?;
                 show_grid = parse_toggle(value, "--grid")?;
             }
+            "--delimiter" => {
+                i += 1;
+                let value = args
+                    .get(i)
+                    .ok_or_else(|| "missing value for --delimiter".to_string())?;
+                if value.is_empty() {
+                    return Err("empty value for --delimiter".to_string());
+                }
+                delimiter = Some(value.clone());
+            }
             "--comments" => {
                 let mut consumed = 0usize;
                 let mut markers = Vec::new();
@@ -355,6 +367,7 @@ where
         style,
         show_key,
         show_grid,
+        delimiter,
         comment_markers,
         extra_set_commands,
         width,
